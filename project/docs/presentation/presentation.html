@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Планировщик маршрута курьера — защита проекта</title>
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  :root {
+    --surface: #fcfcfb;
+    --surface-2: #f2f1ee;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-3: #8a8984;
+    --rule: #dddcd7;
+    --dp: #2a78d6;      /* DP / основной путь */
+    --dp-soft: #e3eefb;
+    --greedy: #eb6834;  /* жадный / ошибка */
+    --greedy-soft: #fde9e0;
+    --ok: #008300;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--surface); color: var(--ink);
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .slide { width: 1280px; height: 720px; padding: 56px 72px 48px; position: relative;
+    overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  .num { position: absolute; right: 72px; bottom: 28px; font-size: 14px; color: var(--ink-3); }
+  .foot { position: absolute; left: 72px; bottom: 28px; font-size: 14px; color: var(--ink-3); }
+
+  .kicker { font-size: 15px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dp); margin-bottom: 10px; }
+  h1 { font-size: 40px; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; margin-bottom: 28px; }
+  h2 { font-size: 21px; font-weight: 650; margin-bottom: 10px; }
+  p, li { font-size: 21px; line-height: 1.45; color: var(--ink); }
+  .muted { color: var(--ink-2); }
+  .small, .small li { font-size: 17px; line-height: 1.45; }
+  ul { padding-left: 24px; }
+  li { margin-bottom: 8px; }
+  li::marker { color: var(--ink-3); }
+  b, strong { font-weight: 650; }
+  code, .mono { font-family: var(--mono); font-size: .88em; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; flex: 1; align-items: start; }
+  .nw { white-space: nowrap; }
+  td.t { width: 64px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .card { background: var(--surface-2); border-radius: 10px; padding: 22px 24px; }
+  .card.dp { background: var(--dp-soft); }
+  .card.bad { background: var(--greedy-soft); }
+  .card h2 { font-size: 19px; }
+  .card p, .card li { font-size: 18px; }
+  .callout { border-left: 4px solid var(--dp); padding: 6px 0 6px 18px; margin-top: 18px; }
+  .callout p { font-size: 20px; }
+
+  pre { font-family: var(--mono); font-size: 15.5px; line-height: 1.5; background: #1f1f1d; color: #ecebe6;
+    padding: 18px 22px; border-radius: 10px; white-space: pre; }
+  pre .c { color: #9a998f; } pre .k { color: #7fb2f0; } pre .h { color: #ffcf70; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 17px; }
+  th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 14px; text-transform: uppercase; letter-spacing: .05em;
+    padding: 8px 12px; border-bottom: 2px solid var(--ink); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; line-height: 1.35; }
+  td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Титул */
+  .title { justify-content: center; padding-left: 96px; }
+  .title h1 { font-size: 60px; margin-bottom: 18px; }
+  .title .sub { font-size: 26px; color: var(--ink-2); max-width: 900px; line-height: 1.4; }
+  .title .meta { margin-top: 56px; font-size: 18px; color: var(--ink-2); line-height: 1.7; }
+  .title .bar { position: absolute; left: 0; top: 0; bottom: 0; width: 14px; background: var(--dp); }
+
+  .pill { display: inline-block; font-size: 15px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); margin-right: 6px; }
+  .pill.dp { background: var(--dp-soft); color: #1b5aa6; }
+  .pill.bad { background: var(--greedy-soft); color: #a8431a; }
+
+  svg text { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .big { font-size: 64px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+</style>
+</head>
+<body>
+
+<!-- 1. Титул -->
+<section class="slide title">
+  <div class="bar"></div>
+  <div class="kicker">Итоговый проект · Алгоритмы и структуры данных</div>
+  <h1>Планировщик маршрута курьера</h1>
+  <p class="sub">Выбор заказов и порядка их доставки при ограничении смены и дедлайнах:
+    алгоритм Дейкстры + динамическое программирование по подмножествам</p>
+  <div class="meta">C# · .NET 10 · 42 теста xUnit<br>Продолжение задачи КТ7 «Маршрут дрона с ограниченным зарядом»</div>
+</section>
+
+<!-- 2. Постановка -->
+<section class="slide">
+  <div class="kicker">Задача</div>
+  <h1>Больше ценных заказов — и назад до конца смены</h1>
+  <div class="cols">
+    <div>
+      <h2>Вход</h2>
+      <ul>
+        <li><b>Дорожная сеть</b> — ориентированный граф, вес дуги — минуты проезда (≥ 0), есть односторонние улицы</li>
+        <li><b>Склад</b> и <b>смена</b> T минут</li>
+        <li><b>Заказы:</b> адрес, ценность, дедлайн (необязательный), время передачи</li>
+      </ul>
+      <h2 style="margin-top:22px">Выход</h2>
+      <ul>
+        <li>Какие заказы везти и в каком порядке, время прибытия, путь по улицам</li>
+        <li>Недоставленные заказы — с причиной</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card dp">
+        <h2>Критерий</h2>
+        <p>Максимум суммарной ценности; при равенстве — более раннее возвращение.</p>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <h2>Ограничения</h2>
+        <p>Прибытие к заказу ≤ его дедлайна<br>Возврат на склад ≤ T</p>
+      </div>
+      <div class="callout">
+        <p>Нужно решить <b>сразу две задачи</b>: выбрать подмножество заказов (как в рюкзаке)
+          и порядок объезда (как в задаче коммивояжёра). Задача NP-трудная.</p>
+      </div>
+    </div>
+  </div>
+  <div class="num">2</div>
+</section>
+
+<!-- 3. Конвейер -->
+<section class="slide">
+  <div class="kicker">Решение</div>
+  <h1>Два шага: сжать граф города, затем точное DP</h1>
+  <svg viewBox="0 0 1136 250" width="1136" height="250" style="margin-top:6px">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#8a8984"/></marker>
+    </defs>
+    <g font-size="17">
+      <rect x="0" y="40" width="200" height="120" rx="10" fill="#f2f1ee"/>
+      <text x="100" y="86" text-anchor="middle" font-weight="650" font-size="19">Город</text>
+      <text x="100" y="114" text-anchor="middle" fill="#52514e">V перекрёстков</text>
+      <text x="100" y="138" text-anchor="middle" fill="#52514e">E дорог</text>
+
+      <rect x="262" y="40" width="250" height="120" rx="10" fill="#e3eefb"/>
+      <text x="387" y="80" text-anchor="middle" font-weight="650" font-size="19">Шаг 1. Дейкстра</text>
+      <text x="387" y="108" text-anchor="middle" fill="#52514e">из склада и каждого</text>
+      <text x="387" y="132" text-anchor="middle" fill="#52514e">адреса: ≤ k + 1 запусков</text>
+
+      <rect x="574" y="40" width="200" height="120" rx="10" fill="#f2f1ee"/>
+      <text x="674" y="86" text-anchor="middle" font-weight="650" font-size="19">Матрица</text>
+      <text x="674" y="114" text-anchor="middle" fill="#52514e">(k+1)×(k+1)</text>
+      <text x="674" y="138" text-anchor="middle" fill="#52514e">кратчайших времён</text>
+
+      <rect x="836" y="40" width="300" height="120" rx="10" fill="#e3eefb"/>
+      <text x="986" y="80" text-anchor="middle" font-weight="650" font-size="19">Шаг 2. DP по подмножествам</text>
+      <text x="986" y="108" text-anchor="middle" fill="#52514e">(mask, last) → самое раннее</text>
+      <text x="986" y="132" text-anchor="middle" fill="#52514e">время; выбор лучшей маски</text>
+
+      <line x1="204" y1="100" x2="256" y2="100" stroke="#8a8984" stroke-width="2" marker-end="url(#ar)"/>
+      <line x1="516" y1="100" x2="568" y2="100" stroke="#8a8984" stroke-width="2" marker-end="url(#ar)"/>
+      <line x1="778" y1="100" x2="830" y2="100" stroke="#8a8984" stroke-width="2" marker-end="url(#ar)"/>
+
+      <text x="387" y="200" text-anchor="middle" fill="#8a8984" font-size="15">O(k · (V+E) log V)</text>
+      <text x="986" y="200" text-anchor="middle" fill="#8a8984" font-size="15">O(2^k · k²)</text>
+      <text x="674" y="200" text-anchor="middle" fill="#8a8984" font-size="15">граф больше не нужен</text>
+    </g>
+  </svg>
+  <div class="cols-3" style="margin-top:14px">
+    <div class="card"><h2>Графы</h2><p>Список смежности, Дейкстра с двоичной кучей, восстановление пути по предшественникам</p></div>
+    <div class="card"><h2>Динамическое программирование</h2><p>Идея Хелда — Карпа + дедлайны, лимит смены и выбор подмножества</p></div>
+    <div class="card"><h2>Жадный — для сравнения</h2><p>«Ближайший сосед» реализован как отклонённая альтернатива</p></div>
+  </div>
+  <div class="num">3</div>
+</section>
+
+<!-- 4. Шаг 1 -->
+<section class="slide">
+  <div class="kicker">Шаг 1 · Графы</div>
+  <h1>Дейкстра из k + 1 точек по списку смежности</h1>
+  <div class="cols">
+    <div>
+      <ul>
+        <li>Ключевые точки — склад и адреса заказов; одинаковые адреса считаются один раз</li>
+        <li>Куча <code>PriorityQueue</code> без decrease-key: устаревшие записи пропускаются при извлечении, записей <span class="nw">≤ E + 1</span></li>
+        <li>Для каждой точки хранится дерево предшественников — по нему восстанавливается путь по улицам</li>
+        <li>Отрицательное время проезда отвергается при вводе: на нём Дейкстра некорректна</li>
+      </ul>
+    </div>
+    <div>
+      <table>
+        <tr><th>Вариант</th><th>Почему</th></tr>
+        <tr><td><span class="pill dp">выбрано</span><br>Список смежности</td><td>Город разреженный: E ≈ 4V. Память O(V + E), Дейкстра идёт только по реальным дорогам</td></tr>
+        <tr><td><span class="pill bad">отклонено</span><br>Матрица смежности</td><td>O(V²) памяти; каждый шаг просматривает строку из V пустых ячеек</td></tr>
+        <tr><td><span class="pill dp">выбрано</span><br>k + 1 раз Дейкстра</td><td>~1,5·10⁶ операций при V = 1600, k = 20; замер — 8 мс</td></tr>
+        <tr><td><span class="pill bad">отклонено</span><br>Флойд — Уоршелл</td><td>O(V³) ≈ 4·10⁹ ради всех пар, а нужны (k+1)². Оставлен эталоном в тестах</td></tr>
+        <tr><td><span class="pill bad">отклонено</span><br>BFS</td><td>Находит путь с минимумом дорог, а не минут</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="num">4</div>
+</section>
+
+<!-- 5. Шаг 2: DP -->
+<section class="slide">
+  <div class="kicker">Шаг 2 · Динамическое программирование</div>
+  <h1>Состояние — какие заказы доставлены и где курьер</h1>
+  <div class="cols" style="grid-template-columns: 1fr 1.15fr;">
+    <div>
+      <div class="card dp">
+        <p><b>finish[mask, last]</b> — самая ранняя минута, когда курьер закончил заказ <b>last</b>, доставив ровно множество <b>mask</b>, не нарушив дедлайнов и ещё успевая на склад</p>
+      </div>
+      <ul class="small" style="margin-top:20px">
+        <li><b>База:</b> finish[{j}, j] = dist(склад, j) + service(j)</li>
+        <li><b>Порядок:</b> маски по возрастанию — переход только добавляет бит</li>
+        <li><b>Ответ:</b> max value(mask) по всем достигнутым состояниям; пустой маршрут допустим всегда</li>
+        <li><b>Путь:</b> массив previous[mask, last] → восстановление с конца</li>
+      </ul>
+    </div>
+<pre><span class="c">// DpRoutePlanner.cs — переход (mask, last) → next</span>
+<span class="k">long</span> arrival = time + dist(last, next);
+<span class="k">if</span> (arrival > deadline[next]) <span class="k">return</span>;
+
+<span class="k">long</span> done = arrival + service[next];
+
+<span class="c">// отсечение: со склада уже не успеть —</span>
+<span class="c">// никакое продолжение не поможет</span>
+<span class="k">if</span> (done + back[next] > shift) <span class="k">return</span>;
+
+<span class="k">int</span> i = (mask | 1 &lt;&lt; next) * k + next;
+<span class="k">if</span> (done &lt; finish[i])
+{
+    finish[i] = (<span class="k">int</span>)done;      <span class="c">// храним минимум</span>
+    previous[i] = last;
+}</pre>
+  </div>
+  <div class="num">5</div>
+</section>
+
+<!-- 6. Корректность -->
+<section class="slide">
+  <div class="kicker">Почему DP даёт оптимум</div>
+  <h1>Достаточно хранить одно число — самое раннее время</h1>
+  <div class="cols" style="grid-template-columns: 1.1fr 1fr;">
+    <div>
+      <ol style="padding-left:26px">
+        <li><b>Будущее зависит только от состояния:</b> где курьер (last), что доставлено (mask) и который час</li>
+        <li><b>Раньше — не хуже.</b> Все ограничения — <i>верхние</i> границы (дедлайн, конец смены). Продолжение позднего маршрута выполнимо и для раннего — моменты прибытия лишь сдвигаются раньше</li>
+        <li><b>Ценность определяется маской</b> и не зависит от порядка внутри неё → поздний маршрут можно отбросить</li>
+        <li><b>Отсечение безопасно:</b> dist — кратчайшие, путь до склада через другие адреса не короче прямого</li>
+      </ol>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Проверено экспериментом</h2>
+        <ul class="small">
+          <li>1500 случайных задач: DP = полный перебор всех упорядоченных подмножеств</li>
+          <li>Эталон независим: свой Флойд — Уоршелл вместо Дейкстры</li>
+          <li>Мутация «хранить позднее время» → падают 3 теста</li>
+        </ul>
+      </div>
+      <div class="callout">
+        <p><b>Граница довода:</b> окна «не раньше» без права ждать или пробки без свойства FIFO ломают «раньше — не хуже»</p>
+      </div>
+    </div>
+  </div>
+  <div class="num">6</div>
+</section>
+
+<!-- 7. Жадный vs DP: контрпример -->
+<section class="slide">
+  <div class="kicker">Архитектурное решение 1</div>
+  <h1>DP, а не жадный: ближайший заказ «съедает» время</h1>
+  <div class="cols" style="grid-template-columns: 1.25fr 1fr; gap: 36px;">
+    <div>
+      <svg viewBox="0 0 640 370" width="640" height="370">
+        <defs>
+          <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker>
+          <marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker>
+        </defs>
+        <!-- дороги -->
+        <line x1="70" y1="160" x2="190" y2="160" stroke="#dddcd7" stroke-width="10" stroke-linecap="round"/>
+        <line x1="190" y1="160" x2="500" y2="160" stroke="#dddcd7" stroke-width="10" stroke-linecap="round"/>
+        <line x1="500" y1="160" x2="600" y2="160" stroke="#dddcd7" stroke-width="10" stroke-linecap="round"/>
+        <text x="130" y="190" text-anchor="middle" font-size="15" fill="#52514e">5 мин</text>
+        <text x="345" y="190" text-anchor="middle" font-size="15" fill="#52514e">30 мин</text>
+        <text x="550" y="190" text-anchor="middle" font-size="15" fill="#52514e">5 мин</text>
+        <!-- маршрут жадного -->
+        <path d="M190,140 C150,105 100,105 72,140" fill="none" stroke="#eb6834" stroke-width="2.5" marker-end="url(#ag)"/>
+        <path d="M75,128 C130,70 380,70 492,142" fill="none" stroke="#eb6834" stroke-width="2.5" marker-end="url(#ag)"/>
+        <text x="290" y="72" text-anchor="middle" font-size="16" fill="#a8431a" font-weight="600">жадный: киоск → офис 1 → склад · ценность 6</text>
+        <!-- маршрут DP -->
+        <path d="M190,180 V292 H600 V264" fill="none" stroke="#2a78d6" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#ad)"/><circle cx="500" cy="292" r="4" fill="#2a78d6"/>
+        <text x="395" y="324" text-anchor="middle" font-size="16" fill="#1b5aa6" font-weight="600">DP: офис 1 и офис 2 → склад · ценность 10</text>
+        <!-- узлы -->
+        <g font-size="16">
+          <circle cx="70" cy="160" r="15" fill="#fcfcfb" stroke="#0b0b0b" stroke-width="2"/>
+          <text x="70" y="226" text-anchor="middle" font-weight="600">Киоск</text><text x="70" y="246" text-anchor="middle" fill="#52514e">ценность 1</text>
+          <rect x="174" y="144" width="32" height="32" rx="5" fill="#0b0b0b"/>
+          <text x="200" y="226" text-anchor="start" font-weight="600">Склад</text>
+          <circle cx="500" cy="160" r="15" fill="#fcfcfb" stroke="#0b0b0b" stroke-width="2"/>
+          <text x="500" y="226" text-anchor="middle" font-weight="600">Офис 1</text><text x="500" y="246" text-anchor="middle" fill="#52514e">ценность 5</text>
+          <circle cx="600" cy="160" r="15" fill="#fcfcfb" stroke="#0b0b0b" stroke-width="2"/>
+          <text x="600" y="226" text-anchor="middle" font-weight="600">Офис 2</text><text x="600" y="246" text-anchor="middle" fill="#52514e">ценность 5</text>
+        </g>
+        <text x="0" y="362" font-size="15" fill="#8a8984">Смена 75 мин. Жадному на второй офис не хватает 5 минут (80 &gt; 75).</text>
+      </svg>
+    </div>
+    <div>
+      <h2>Жадный от оптимума, %</h2>
+      <svg viewBox="0 0 420 270" width="420" height="270">
+        <g font-size="15">
+          <!-- ось и 100% -->
+          <line x1="150" y1="10" x2="150" y2="230" stroke="#dddcd7" stroke-width="1"/>
+          <line x1="400" y1="10" x2="400" y2="230" stroke="#0b0b0b" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <text x="404" y="250" text-anchor="end" fill="#52514e">100 % = DP</text>
+          <text x="150" y="250" text-anchor="middle" fill="#8a8984">0</text>
+          <!-- бары: ширина = 250 * доля -->
+          <text x="140" y="38" text-anchor="end">Город (01)</text>
+          <rect x="150" y="20" width="211" height="28" rx="4" fill="#eb6834"/><text x="367" y="40" fill="#0b0b0b">84</text>
+          <text x="140" y="88" text-anchor="end">Ловушка (02)</text>
+          <rect x="150" y="70" width="150" height="28" rx="4" fill="#eb6834"/><text x="306" y="90">60</text>
+          <text x="140" y="138" text-anchor="end">Дедлайн (03)</text>
+          <rect x="150" y="120" width="125" height="28" rx="4" fill="#eb6834"/><text x="281" y="140">50</text>
+          <text x="140" y="188" text-anchor="end">Бенчмарк k = 20</text>
+          <rect x="150" y="170" width="214" height="28" rx="4" fill="#eb6834"/><text x="370" y="190">86</text>
+        </g>
+      </svg>
+      <p class="small muted">На 1500 случайных задачах жадный никогда не лучше DP. Свойства жадного выбора (как каноничность монет в КТ5) у задачи нет.</p>
+    </div>
+  </div>
+  <div class="num">7</div>
+</section>
+
+<!-- 8. АР-2 и АР-4 -->
+<section class="slide">
+  <div class="kicker">Архитектурные решения 2 и 4</div>
+  <h1>Чем этот проект отличается от маршрута дрона (КТ7)</h1>
+  <div class="cols">
+    <div class="card">
+      <h2>Сжатие графа вместо поиска по состояниям города</h2>
+      <p>Можно было, как в КТ7, искать по состояниям <code>(перекрёсток, mask)</code> прямо в городе.</p>
+      <table style="margin-top:14px">
+        <tr><th></th><th class="r">состояний при V = 1600, k = 20</th></tr>
+        <tr><td>(перекрёсток, mask)</td><td class="r">V · 2^k ≈ 1,7 млрд</td></tr>
+        <tr><td><b>(last, mask)</b></td><td class="r"><b>k · 2^k ≈ 21 млн</b></td></tr>
+      </table>
+      <p style="margin-top:14px">Шаг 1 убирает V из экспоненциальной части — в 80 раз меньше состояний. Между заказами курьер всегда едет кратчайшим путём: раньше — не хуже.</p>
+    </div>
+    <div class="card">
+      <h2>Время — значение, а не координата состояния</h2>
+      <p><b>КТ7:</b> заряд был частью ключа <code>(станция, заряд)</code> — «дешевле» и «больше заряда» конфликтуют, ни один путь не доминирует.</p>
+      <p style="margin-top:12px"><b>Здесь:</b> «раньше» — единственный критерий, ценность задаётся маской. Конфликта нет → храним одно число.</p>
+      <p style="margin-top:12px">Таблица в T раз меньше, чем <code>dp[mask][last][время]</code>: при смене 480 мин — в 480 раз.</p>
+    </div>
+  </div>
+  <div class="num">8</div>
+</section>
+
+<!-- 9. Сложность и масштаб -->
+<section class="slide">
+  <div class="kicker">Сложность</div>
+  <h1>O(k·(V+E) log V + 2^k·k²) — и упирается всё в память</h1>
+  <div class="cols" style="grid-template-columns: 1fr 1.1fr;">
+    <div>
+      <table>
+        <tr><th>Часть</th><th>Время</th><th>Память</th></tr>
+        <tr><td>Дейкстры</td><td>O(k·(V+E) log V)</td><td>O(k·V)</td></tr>
+        <tr><td>DP: циклы mask × last × next</td><td>O(2^k · k²)</td><td>O(2^k · k)</td></tr>
+        <tr><td>Сборка плана</td><td>O(k + путь)</td><td>то же</td></tr>
+      </table>
+      <ul class="small" style="margin-top:22px">
+        <li>Каждый новый заказ <b>удваивает</b> таблицу DP</li>
+        <li>k = 20 → ~100 МБ; k = 25 → ~4 ГБ; k = 30 → ~160 ГБ</li>
+        <li>Поэтому k &gt; 20 отклоняется явной ошибкой, а не падением по памяти</li>
+        <li>Рекурсии в решении нет — стек от входа не растёт</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Время DP, мс <span class="muted" style="font-weight:400;font-size:16px">· решётка 40×40, Release</span></h2>
+      <svg viewBox="0 0 520 330" width="520" height="330">
+        <g font-size="15">
+          <!-- сетка: шкала 0..100 мс на 260 px -->
+          <line x1="50" y1="270" x2="510" y2="270" stroke="#0b0b0b" stroke-width="1"/>
+          <line x1="50" y1="140" x2="510" y2="140" stroke="#dddcd7" stroke-width="1"/>
+          <line x1="50" y1="10" x2="510" y2="10" stroke="#dddcd7" stroke-width="1"/>
+          <text x="42" y="275" text-anchor="end" fill="#8a8984">0</text>
+          <text x="42" y="145" text-anchor="end" fill="#8a8984">50</text>
+          <text x="42" y="15" text-anchor="end" fill="#8a8984">100</text>
+          <!-- бары: k = 12,14,16,18,20 → 0,1,4,16,90 мс ; h = ms*2.6 -->
+          <rect x="70"  y="268" width="56" height="2"     rx="1" fill="#2a78d6"/>
+          <rect x="160" y="267.4" width="56" height="2.6" rx="1" fill="#2a78d6"/>
+          <path d="M250,270 v-10.4 q0,-4 4,-4 h48 q4,0 4,4 v10.4 z" fill="#2a78d6"/>
+          <path d="M340,270 v-37.6 q0,-4 4,-4 h48 q4,0 4,4 v37.6 z" fill="#2a78d6"/>
+          <path d="M430,270 v-230 q0,-4 4,-4 h48 q4,0 4,4 v230 z" fill="#2a78d6"/>
+          <text x="98"  y="258" text-anchor="middle">&lt;1</text>
+          <text x="188" y="258" text-anchor="middle">1</text>
+          <text x="278" y="248" text-anchor="middle">4</text>
+          <text x="368" y="220" text-anchor="middle">16</text>
+          <text x="458" y="28" text-anchor="middle" font-weight="650">90</text>
+          <text x="98"  y="294" text-anchor="middle" fill="#52514e">k = 12</text>
+          <text x="188" y="294" text-anchor="middle" fill="#52514e">14</text>
+          <text x="278" y="294" text-anchor="middle" fill="#52514e">16</text>
+          <text x="368" y="294" text-anchor="middle" fill="#52514e">18</text>
+          <text x="458" y="294" text-anchor="middle" fill="#52514e">20</text>
+          <text x="280" y="322" text-anchor="middle" fill="#8a8984">Дейкстры при этом — 6–8 мс независимо от k</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+  <div class="num">9</div>
+</section>
+
+<!-- 10. Отклонённые альтернативы -->
+<section class="slide">
+  <div class="kicker">Отклонённые альтернативы</div>
+  <h1>Что ещё рассматривалось и почему нет</h1>
+  <table style="font-size:17.5px">
+    <tr><th style="width:30%">Подход</th><th style="width:20%">Сложность</th><th>Причина отказа</th></tr>
+    <tr><td>Полный перебор порядков</td><td>O(e · k! · k)</td><td>k = 12 → ~1,3·10⁹ вариантов. DP схлопывает перестановки одного множества с одним концом. Оставлен эталоном в тестах</td></tr>
+    <tr><td>Жадный «ближайший сосед»</td><td>O(k²)</td><td>Не оптимален: контрпримеры 01–03, до −50 % ценности</td></tr>
+    <tr><td>Жадный «ценность за минуту»</td><td>O(k²)</td><td>Срочный заказ важнее выгодного по отношению; свойства жадного выбора нет</td></tr>
+    <tr><td>Рюкзак по бюджету времени</td><td>O(k · T)</td><td>Время на заказ зависит от того, откуда едет курьер, — не аддитивно</td></tr>
+    <tr><td>Поиск по (перекрёсток, mask)</td><td>O(V · 2^k · k · log)</td><td>В V / k раз больше состояний</td></tr>
+    <tr><td>Флойд — Уоршелл · матрица смежности</td><td>O(V³) · O(V²)</td><td>Ненужные пары; граф разреженный</td></tr>
+    <tr><td>Ветви и границы, ЦЛП, 2-opt, отжиг</td><td>экспонента / без гарантий</td><td>Нужны при k ≫ 20; точные — сложны, эвристики не гарантируют оптимум</td></tr>
+  </table>
+  <div class="num">10</div>
+</section>
+
+<!-- 11. Пограничные случаи -->
+<section class="slide">
+  <div class="kicker">Пограничные случаи и некорректные данные</div>
+  <h1>Ответ есть всегда: пустой маршрут допустим</h1>
+  <div class="cols">
+    <div>
+      <h2>Пограничные случаи <span class="pill dp">каждый — тест</span></h2>
+      <ul class="small">
+        <li>Заказов нет → путь <code>[Склад]</code>, возврат в 0</li>
+        <li>Один заказ ровно впритык / на минуту дольше смены</li>
+        <li>Дедлайн ровно в момент прибытия → успел</li>
+        <li>Смена 0 → только заказы на самом складе</li>
+        <li>Ни один заказ не выполним → у каждого своя причина:
+          <span class="muted">недостижим · нет пути обратно (одностороннее) · не успеть к дедлайну · не укладывается в смену</span></li>
+        <li>Несколько заказов по одному адресу; повторный проезд перекрёстка</li>
+        <li>Ровно 20 заказов — решается; 21 — явная ошибка</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Некорректный ввод <span class="pill bad">отклоняется явно</span></h2>
+      <ul class="small">
+        <li><b>Отрицательное время проезда</b> — ломает инвариант Дейкстры; при отрицательном цикле кратчайшего пути нет</li>
+        <li>Отрицательные смена, дедлайн, время передачи; ценность ≤ 0</li>
+        <li>Повтор номера заказа, адрес или склад вне сети, битый JSON</li>
+        <li>Циклы в графе — норма для города, обрабатываются без особой логики</li>
+        <li>Суммы времени — в <code>long</code>; RouteBuilder перепроверяет любой план</li>
+      </ul>
+    </div>
+  </div>
+  <div class="num">11</div>
+</section>
+
+<!-- 12. Тестирование и демо -->
+<section class="slide">
+  <div class="kicker">Тестирование и демонстрация</div>
+  <h1>42 теста и 7 сценариев</h1>
+  <div class="cols" style="grid-template-columns: 1fr 1.1fr;">
+    <div>
+      <div style="display:flex; gap:36px; margin-bottom:20px">
+        <div><div class="big">42</div><p class="small muted">теста xUnit, ~1 с</p></div>
+        <div><div class="big">1500</div><p class="small muted">задач сверено с полным перебором</p></div>
+      </div>
+      <ul class="small">
+        <li><b>Дейкстра</b> = Флойд — Уоршелл на 300 случайных графах</li>
+        <li><b>Каждый план</b> перепроверяется независимо: путь из реальных дорог, времена, дедлайны, смена</li>
+        <li><b>Жадный</b> всегда допустим и никогда не лучше DP</li>
+        <li><b>Мутационная проверка:</b> сломанный DP ловят 3 теста</li>
+      </ul>
+    </div>
+<pre><span class="c"># из папки project/</span>
+dotnet test
+
+<span class="c"># основной сценарий: DP 19 против жадного 16</span>
+dotnet run --project src/CourierRouting.Cli \
+  -- scenarios/01-city.json
+
+<span class="c"># ловушка для жадного и пограничный случай</span>
+... -- scenarios/02-greedy-trap.json
+... -- scenarios/04-edge-unreachable.json
+
+<span class="c"># некорректный ввод: отрицательная дорога</span>
+... -- scenarios/07-invalid-negative.json
+
+<span class="c"># рост времени с числом заказов</span>
+dotnet run -c Release ... -- --bench</pre>
+  </div>
+  <div class="num">12</div>
+</section>
+
+<!-- 13. Основной сценарий -->
+<section class="slide">
+  <div class="kicker">Основной сценарий · 01-city.json</div>
+  <h1>12 перекрёстков, 8 заказов, смена 2 часа</h1>
+  <div class="cols">
+    <div class="card dp">
+      <h2>DP — ценность 19, возврат в 100 мин</h2>
+      <table style="font-size:16.5px">
+        <tr><td class="t">17</td><td><b>F</b> Школа <span class="muted">дедлайн 25</span></td></tr>
+        <tr><td class="t">24</td><td><b>B</b> Больница <span class="muted">дедлайн 60</span></td></tr>
+        <tr><td class="t">36</td><td>H Парк</td></tr>
+        <tr><td class="t">50</td><td>C Университет</td></tr>
+        <tr><td class="t">59</td><td><b>D</b> Стадион <span class="muted">дедлайн 90</span></td></tr>
+        <tr><td class="t">70</td><td>E Набережная</td></tr>
+        <tr><td class="t">86</td><td>G Завод</td></tr>
+      </table>
+      <p class="small muted" style="margin-top:10px">Не доставлен A (Вокзал, дедлайн 30) — не помещается вместе с F</p>
+    </div>
+    <div class="card bad">
+      <h2>Жадный — ценность 16, возврат в 88 мин</h2>
+      <table style="font-size:16.5px">
+        <tr><td class="t">12</td><td>G Завод <span class="muted">ближайший, ценность 1</span></td></tr>
+        <tr><td class="t">28</td><td>E Набережная</td></tr>
+        <tr><td class="t">38</td><td>D Стадион</td></tr>
+        <tr><td class="t">47</td><td>C Университет</td></tr>
+        <tr><td class="t">60</td><td>B Больница <span class="muted">впритык к дедлайну</span></td></tr>
+        <tr><td class="t">72</td><td>H Парк</td></tr>
+      </table>
+      <p class="small" style="margin-top:10px">Поехал к ближайшему заводу и <b>не успел к срочному F</b>. Смена использована не полностью (88 из 120 мин), а срочный заказ уже потерян</p>
+    </div>
+  </div>
+  <div class="num">13</div>
+</section>
+
+<!-- 14. Границы применимости -->
+<section class="slide">
+  <div class="kicker">Границы применимости</div>
+  <h1>Что сломается первым при изменении условий</h1>
+  <table style="font-size:17.5px">
+    <tr><th style="width:30%">Изменение</th><th>Что произойдёт</th></tr>
+    <tr><td>Заказов — сотни</td><td><b>Первой ломается память DP</b> (2^k · k). Дальше — кластеризация по районам + DP внутри, ветви и границы или эвристики</td></tr>
+    <tr><td>Город — миллионы перекрёстков</td><td>Растёт только шаг 1, линейно по k. Двунаправленная Дейкстра, A*, contraction hierarchies; <span class="nw">k + 1</span> запусков параллелятся тривиально</td></tr>
+    <tr><td>Окна «не раньше»</td><td>С правом ждать — DP корректен: arrival = max(arrival, opens). Без права ждать доминирование ломается → время становится измерением, как заряд в КТ7</td></tr>
+    <tr><td>Пробки (время зависит от момента)</td><td>Корректно, пока выполняется FIFO: выехав раньше, не приедешь позже</td></tr>
+    <tr><td>Вместимость сумки</td><td>Проверка по mask — размер состояния тот же</td></tr>
+    <tr><td>Несколько курьеров</td><td>Разбиение подмножеств между курьерами — O(3^k); на практике эвристики</td></tr>
+    <tr><td>Распараллеливание</td><td>Узкое место — DP: параллелится только внутри слоя |mask| = m, упор в пропускную способность памяти</td></tr>
+  </table>
+  <div class="num">14</div>
+</section>
+
+<!-- 15. Итоги -->
+<section class="slide">
+  <div class="kicker">Итоги</div>
+  <h1>Комбинация двух техник курса — и обоснование каждой</h1>
+  <div class="cols-3" style="margin-top:6px">
+    <div class="card dp"><h2>Графы</h2><p>Список смежности и Дейкстра сжимают город из V перекрёстков до k + 1 точек</p></div>
+    <div class="card dp"><h2>DP по подмножествам</h2><p>Точный оптимум за O(2^k · k²); корректность доказана доминированием и проверена перебором</p></div>
+    <div class="card bad"><h2>Жадный отклонён</h2><p>Контрпримеры в тестах и демо: теряет до половины ценности</p></div>
+  </div>
+  <div class="callout" style="margin-top:36px">
+    <p>Главная граница метода — память при k &gt; 20. Она осознанная: до 20 заказов DP проще и точнее любых альтернатив, а превышение отклоняется явно</p>
+  </div>
+  <p style="margin-top:auto; font-size:32px; font-weight:650">Спасибо за внимание! Вопросы?</p>
+  <div class="num">15</div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,35 @@
+// Основной сценарий: центр города, 8 заказов, смена 2 часа.
+// Набережная → Площадь — улица с односторонним движением.
+{
+  "depot": "Склад",
+  "shiftMinutes": 120,
+  "roads": [
+    { "from": "Склад",       "to": "Площадь",     "minutes": 8 },
+    { "from": "Склад",       "to": "Рынок",       "minutes": 6 },
+    { "from": "Склад",       "to": "Завод",       "minutes": 12 },
+    { "from": "Рынок",       "to": "Вокзал",      "minutes": 7 },
+    { "from": "Площадь",     "to": "Вокзал",      "minutes": 5 },
+    { "from": "Площадь",     "to": "Парк",        "minutes": 6 },
+    { "from": "Площадь",     "to": "Школа",       "minutes": 9 },
+    { "from": "Парк",        "to": "Больница",    "minutes": 7 },
+    { "from": "Школа",       "to": "Больница",    "minutes": 4 },
+    { "from": "Больница",    "to": "Университет", "minutes": 10 },
+    { "from": "Парк",        "to": "Университет", "minutes": 12 },
+    { "from": "Университет", "to": "Стадион",     "minutes": 6 },
+    { "from": "Стадион",     "to": "Набережная",  "minutes": 8 },
+    { "from": "Набережная",  "to": "Мост",        "minutes": 5 },
+    { "from": "Мост",        "to": "Завод",       "minutes": 9 },
+    { "from": "Вокзал",      "to": "Мост",        "minutes": 14 },
+    { "from": "Набережная",  "to": "Площадь",     "minutes": 11, "oneWay": true }
+  ],
+  "orders": [
+    { "id": "A", "location": "Вокзал",      "value": 3, "deadline": 30, "service": 3 },
+    { "id": "B", "location": "Больница",    "value": 5, "deadline": 60, "service": 5 },
+    { "id": "C", "location": "Университет", "value": 2,                 "service": 3 },
+    { "id": "D", "location": "Стадион",     "value": 4, "deadline": 90, "service": 3 },
+    { "id": "E", "location": "Набережная",  "value": 2,                 "service": 2 },
+    { "id": "F", "location": "Школа",       "value": 3, "deadline": 25, "service": 3 },
+    { "id": "G", "location": "Завод",       "value": 1,                 "service": 2 },
+    { "id": "H", "location": "Парк",        "value": 2,                 "service": 2 }
+  ]
+}

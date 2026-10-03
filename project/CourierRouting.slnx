@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CourierRouting.Cli/CourierRouting.Cli.csproj" />
+    <Project Path="src/CourierRouting/CourierRouting.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CourierRouting.Tests/CourierRouting.Tests.csproj" />
+  </Folder>
+</Solution>
