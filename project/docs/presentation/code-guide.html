@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Путеводитель по коду</title>
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  :root {
+    --surface: #fcfcfb;
+    --surface-2: #f2f1ee;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-3: #8a8984;
+    --rule: #dddcd7;
+    --dp: #2a78d6;      /* DP / основной путь */
+    --dp-soft: #e3eefb;
+    --greedy: #eb6834;  /* жадный / ошибка */
+    --greedy-soft: #fde9e0;
+    --ok: #008300;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--surface); color: var(--ink);
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .slide { width: 1280px; height: 720px; padding: 56px 72px 48px; position: relative;
+    overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  .num { position: absolute; right: 72px; bottom: 28px; font-size: 14px; color: var(--ink-3); }
+  .foot { position: absolute; left: 72px; bottom: 28px; font-size: 14px; color: var(--ink-3); }
+
+  .kicker { font-size: 15px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dp); margin-bottom: 10px; }
+  h1 { font-size: 40px; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; margin-bottom: 28px; }
+  h2 { font-size: 21px; font-weight: 650; margin-bottom: 10px; }
+  p, li { font-size: 21px; line-height: 1.45; color: var(--ink); }
+  .muted { color: var(--ink-2); }
+  .small, .small li { font-size: 17px; line-height: 1.45; }
+  ul { padding-left: 24px; }
+  li { margin-bottom: 8px; }
+  li::marker { color: var(--ink-3); }
+  b, strong { font-weight: 650; }
+  code, .mono { font-family: var(--mono); font-size: .88em; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; flex: 1; align-items: start; }
+  .nw { white-space: nowrap; }
+  td.t { width: 64px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .card { background: var(--surface-2); border-radius: 10px; padding: 22px 24px; }
+  .card.dp { background: var(--dp-soft); }
+  .card.bad { background: var(--greedy-soft); }
+  .card h2 { font-size: 19px; }
+  .card p, .card li { font-size: 18px; }
+  .callout { border-left: 4px solid var(--dp); padding: 6px 0 6px 18px; margin-top: 18px; }
+  .callout p { font-size: 20px; }
+
+  pre { font-family: var(--mono); font-size: 15.5px; line-height: 1.5; background: #1f1f1d; color: #ecebe6;
+    padding: 18px 22px; border-radius: 10px; white-space: pre; }
+  pre .c { color: #9a998f; } pre .k { color: #7fb2f0; } pre .h { color: #ffcf70; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 17px; }
+  th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 14px; text-transform: uppercase; letter-spacing: .05em;
+    padding: 8px 12px; border-bottom: 2px solid var(--ink); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; line-height: 1.35; }
+  td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Титул */
+  .title { justify-content: center; padding-left: 96px; }
+  .title h1 { font-size: 60px; margin-bottom: 18px; }
+  .title .sub { font-size: 26px; color: var(--ink-2); max-width: 900px; line-height: 1.4; }
+  .title .meta { margin-top: 56px; font-size: 18px; color: var(--ink-2); line-height: 1.7; }
+  .title .bar { position: absolute; left: 0; top: 0; bottom: 0; width: 14px; background: var(--dp); }
+
+  .pill { display: inline-block; font-size: 15px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); margin-right: 6px; }
+  .pill.dp { background: var(--dp-soft); color: #1b5aa6; }
+  .pill.bad { background: var(--greedy-soft); color: #a8431a; }
+
+  svg text { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .big { font-size: 64px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  table.dense { font-size: 16px; }
+  table.dense td { padding: 7px 10px; }
+  table.dense code { font-size: 14.5px; }
+  .card p + p { margin-top: 6px; }
+</style>
+</head>
+<body>
+<!-- 1. Титул -->
+<section class="slide title">
+  <div class="bar"></div>
+  <div class="kicker">Итоговый проект · Устройство кода</div>
+  <h1>Путеводитель по коду</h1>
+  <p class="sub">Какой класс за что отвечает и что означает каждая важная переменная — от графа города до таблицы DP</p>
+  <div class="meta">Планировщик маршрута курьера · C# · .NET 10</div>
+</section>
+
+<!-- 2. Три вида индексов -->
+<section class="slide">
+  <div class="kicker">Главное, что нельзя перепутать</div>
+  <h1>Три нумерации: перекрёсток, точка, заказ</h1>
+  <table class="dense">
+    <tr><th style="width:22%">Индекс</th><th style="width:28%">Что нумерует</th><th style="width:22%">Диапазон</th><th>Где используется</th></tr>
+    <tr><td><b>node</b> — перекрёсток</td><td>Вершина графа города</td><td>0 … V−1</td><td><code>RoadNetwork</code>, Дейкстра</td></tr>
+    <tr><td><b>point</b> — точка</td><td>Склад и адреса заказов</td><td>0 = склад,<br>1 … k = заказы</td><td><code>TravelTimes.Minutes(from, to)</code></td></tr>
+    <tr><td><b>order</b> — заказ</td><td>Элемент <code>problem.Orders</code></td><td>0 … k−1</td><td>DP, жадный, битовые маски</td></tr>
+  </table>
+  <div class="cols" style="margin-top:28px; gap:36px">
+    <div class="callout" style="margin-top:0">
+      <p><b>Заказ i = точка i + 1</b>, склад = точка 0.<br>Отсюда все <code>i + 1</code> и <code>next + 1</code> в коде.</p>
+    </div>
+    <div class="callout" style="margin-top:0">
+      <p>Точка → перекрёсток: через массив <code>_nodeOfPoint</code> в <code>TravelTimes</code>.</p>
+    </div>
+  </div>
+  <div class="num">2</div>
+</section>
+
+<!-- 3. Как классы работают вместе -->
+<section class="slide">
+  <div class="kicker">Архитектура</div>
+  <h1>Как классы передают данные друг другу</h1>
+  <svg viewBox="0 0 1136 470" width="1136" height="470">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8a8984"/></marker></defs>
+    <g font-size="17">
+      <rect x="0" y="20" width="190" height="64" rx="10" fill="#f2f1ee"/>
+      <text x="95" y="58" text-anchor="middle" font-weight="650">JSON-сценарий</text>
+
+      <rect x="250" y="20" width="200" height="64" rx="10" fill="#f2f1ee"/>
+      <text x="350" y="48" text-anchor="middle" font-weight="650">ScenarioLoader</text>
+      <text x="350" y="70" text-anchor="middle" fill="#52514e" font-size="15">чтение JSON</text>
+
+      <rect x="510" y="20" width="300" height="64" rx="10" fill="#f2f1ee"/>
+      <text x="660" y="48" text-anchor="middle" font-weight="650">DeliveryProblem</text>
+      <text x="660" y="70" text-anchor="middle" fill="#52514e" font-size="15">RoadNetwork + Orders + склад + смена</text>
+
+      <rect x="510" y="130" width="300" height="76" rx="10" fill="#e3eefb"/>
+      <text x="660" y="160" text-anchor="middle" font-weight="650">TravelTimes</text>
+      <text x="660" y="184" text-anchor="middle" fill="#52514e" font-size="15">матрица времён между точками</text>
+
+      <rect x="870" y="130" width="266" height="76" rx="10" fill="#f2f1ee"/>
+      <text x="1003" y="160" text-anchor="middle" font-weight="650">ShortestPaths</text>
+      <text x="1003" y="184" text-anchor="middle" fill="#52514e" font-size="15">Дейкстра из каждой точки</text>
+
+      <rect x="330" y="260" width="280" height="76" rx="10" fill="#e3eefb"/>
+      <text x="470" y="290" text-anchor="middle" font-weight="650">DpRoutePlanner</text>
+      <text x="470" y="314" text-anchor="middle" fill="#52514e" font-size="15">точный порядок заказов</text>
+
+      <rect x="710" y="260" width="280" height="76" rx="10" fill="#fde9e0"/>
+      <text x="850" y="290" text-anchor="middle" font-weight="650">GreedyRoutePlanner</text>
+      <text x="850" y="314" text-anchor="middle" fill="#52514e" font-size="15">жадный, для сравнения</text>
+
+      <rect x="510" y="384" width="300" height="70" rx="10" fill="#f2f1ee"/>
+      <text x="660" y="412" text-anchor="middle" font-weight="650">RouteBuilder → RoutePlan</text>
+      <text x="660" y="436" text-anchor="middle" fill="#52514e" font-size="15">проверка и сборка плана</text>
+
+      <rect x="870" y="384" width="266" height="70" rx="10" fill="#f2f1ee"/>
+      <text x="1003" y="412" text-anchor="middle" font-weight="650">ConsoleReport</text>
+      <text x="1003" y="436" text-anchor="middle" fill="#52514e" font-size="15">вывод в консоль</text>
+
+      <g stroke="#8a8984" stroke-width="2" fill="none" marker-end="url(#ar)">
+        <line x1="194" y1="52" x2="244" y2="52"/>
+        <line x1="454" y1="52" x2="504" y2="52"/>
+        <line x1="660" y1="88" x2="660" y2="124"/>
+        <line x1="814" y1="168" x2="864" y2="168"/>
+        <path d="M600,210 L520,254"/>
+        <path d="M720,210 L800,254"/>
+        <path d="M520,340 L600,378"/>
+        <path d="M800,340 L720,378"/>
+        <line x1="814" y1="419" x2="864" y2="419"/>
+      </g>
+    </g>
+  </svg>
+  <div class="num">3</div>
+</section>
+
+<!-- 4. RoadNetwork -->
+<section class="slide">
+  <div class="kicker">Graph/RoadNetwork.cs</div>
+  <h1>RoadNetwork — граф города списком смежности</h1>
+  <div class="cols" style="grid-template-columns: 1.5fr 1fr; gap:40px">
+    <table class="dense">
+      <tr><th style="width:38%">Член</th><th>Что это</th></tr>
+      <tr><td><code>_adjacency</code></td><td>Список смежности: <code>_adjacency[v]</code> — все дороги из перекрёстка v</td></tr>
+      <tr><td><code>_names</code></td><td>Имя по номеру: <code>_names[3]</code> = «Вокзал»</td></tr>
+      <tr><td><code>_indexByName</code></td><td>Обратный словарь: номер по имени</td></tr>
+      <tr><td><code>NodeCount</code> / <code>RoadCount</code></td><td>V и E; двусторонняя дорога = 2 дуги</td></tr>
+      <tr><td><code>AddNode(name)</code></td><td>Добавить перекрёсток или вернуть номер существующего</td></tr>
+      <tr><td><code>AddRoad(from, to, minutes, twoWay)</code></td><td>Добавить дорогу. <b>Здесь отклоняется отрицательное время</b></td></tr>
+      <tr><td><code>RoadsFrom(v)</code></td><td>Дороги из v — их перебирает Дейкстра</td></tr>
+      <tr><td><code>Name(v)</code> / <code>IndexOf(name)</code></td><td>Перевод номер ↔ имя</td></tr>
+    </table>
+    <div>
+      <div class="card">
+        <h2>Road — одна дуга</h2>
+        <p><code>To</code> — номер перекрёстка, куда ведёт дорога</p>
+        <p><code>Minutes</code> — время проезда</p>
+      </div>
+      <div class="callout">
+        <p>Внутри — только числовые индексы. Имена нужны лишь на входе и при выводе.</p>
+      </div>
+    </div>
+  </div>
+  <div class="num">4</div>
+</section>
+
+<!-- 5. Дейкстра -->
+<section class="slide">
+  <div class="kicker">Graph/ShortestPaths.cs</div>
+  <h1>Dijkstra(network, source) — переменные</h1>
+  <div class="cols" style="grid-template-columns: 1.35fr 1fr; gap:40px">
+    <table class="dense">
+      <tr><th style="width:30%">Переменная</th><th>Что это</th></tr>
+      <tr><td><code>n</code></td><td>Число перекрёстков</td></tr>
+      <tr><td><code>distance[v]</code></td><td>Лучшее известное время от source до v; в начале <code>Unreachable</code></td></tr>
+      <tr><td><code>previous[v]</code></td><td>Откуда пришли в v по кратчайшему пути; −1 — у источника и недостижимых</td></tr>
+      <tr><td><code>heap</code></td><td>Куча (перекрёсток, расстояние): достаёт ближайший</td></tr>
+      <tr><td><code>node</code>, <code>dist</code></td><td>Извлечённый перекрёсток и расстояние, с которым его положили</td></tr>
+      <tr><td><code>dist &gt; distance[node]</code></td><td>Устаревшая запись — пропуск (ленивое удаление)</td></tr>
+      <tr><td><code>candidate</code></td><td>Время до соседа через node; в <code>long</code> — без переполнения</td></tr>
+    </table>
+    <div>
+      <div class="card dp">
+        <h2>ShortestPathTree — результат</h2>
+        <ul class="small">
+          <li><code>DistanceTo(v)</code> — кратчайшее время</li>
+          <li><code>CanReach(v)</code> — достижим ли v</li>
+          <li><code>PathTo(v)</code> — путь: идёт по <code>previous</code> от v назад к источнику, затем разворачивает список</li>
+        </ul>
+      </div>
+      <div class="callout">
+        <p>В <code>PriorityQueue</code> нет decrease-key — поэтому вершина кладётся повторно, а старые записи отбрасываются.</p>
+      </div>
+    </div>
+  </div>
+  <div class="num">5</div>
+</section>
+
+<!-- 6. Model -->
+<section class="slide">
+  <div class="kicker">Model/</div>
+  <h1>Данные задачи и результат</h1>
+  <div class="cols-3" style="grid-template-columns: 1fr 1fr 1.15fr">
+    <div class="card">
+      <h2>Order — заказ</h2>
+      <ul class="small">
+        <li><code>Id</code> — номер («A», «F1»)</li>
+        <li><code>Location</code> — имя перекрёстка-адреса</li>
+        <li><code>Value</code> — ценность, ≥ 1</li>
+        <li><code>DeadlineMinute</code> — крайняя минута прибытия; <code>null</code> — без дедлайна</li>
+        <li><code>ServiceMinutes</code> — время передачи</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>DeliveryProblem</h2>
+      <ul class="small">
+        <li><code>Network</code> — город</li>
+        <li><code>Depot</code> — имя склада</li>
+        <li><code>Orders</code> — заказы</li>
+        <li><code>ShiftMinutes</code> — T, длина смены</li>
+      </ul>
+      <p class="small" style="margin-top:10px"><b>Конструктор проверяет весь ввод:</b> адреса, повтор Id, отрицательные значения</p>
+    </div>
+    <div class="card dp">
+      <h2>RoutePlan — результат</h2>
+      <ul class="small">
+        <li><code>Stops</code> — остановки (заказ, прибытие, отъезд)</li>
+        <li><code>Skipped</code> — недоставленные + причина</li>
+        <li><code>StreetPath</code> — путь склад → … → склад</li>
+        <li><code>ReturnMinute</code>, <code>TotalValue</code></li>
+      </ul>
+    </div>
+  </div>
+  <h2 style="margin-top:26px">SkipReason — почему заказ не доставлен</h2>
+  <div style="display:flex; gap:10px; flex-wrap:wrap">
+    <span class="pill bad">Unreachable — нет пути туда или обратно</span>
+    <span class="pill bad">DeadlineUnreachable — не успеть даже напрямую</span>
+    <span class="pill bad">ShiftTooShort — один не влезает в смену</span>
+    <span class="pill">NotSelected — не поместился в маршрут</span>
+  </div>
+  <div class="num">6</div>
+</section>
+
+<!-- 7. TravelTimes -->
+<section class="slide">
+  <div class="kicker">Planning/TravelTimes.cs · шаг 1</div>
+  <h1>TravelTimes — город сжимается до k + 1 точек</h1>
+  <div class="cols" style="grid-template-columns: 1.4fr 1fr; gap:40px">
+    <table class="dense">
+      <tr><th style="width:34%">Член</th><th>Что это</th></tr>
+      <tr><td><code>_nodeOfPoint[p]</code></td><td>Перекрёсток точки p: 0 — склад, i+1 — адрес заказа i</td></tr>
+      <tr><td><code>_treeOfPoint[p]</code></td><td>Дерево кратчайших путей Дейкстры <b>из</b> точки p</td></tr>
+      <tr><td><code>treeByNode</code></td><td>Кэш: один перекрёсток — один запуск Дейкстры</td></tr>
+      <tr><td><code>PointCount</code></td><td>k + 1</td></tr>
+      <tr><td><code>DijkstraRuns</code></td><td>Сколько раз реально запускалась Дейкстра</td></tr>
+      <tr><td><code>Minutes(from, to)</code></td><td><b>Главный метод:</b> кратчайшее время между точками</td></tr>
+      <tr><td><code>Path(from, to)</code></td><td>Перекрёстки пути — для <code>StreetPath</code></td></tr>
+    </table>
+<pre><span class="c">// TravelTimes: точка → перекрёсток → время</span>
+<span class="k">public int</span> Minutes(<span class="k">int</span> from, <span class="k">int</span> to) =&gt;
+    _treeOfPoint[from]
+        .DistanceTo(_nodeOfPoint[to]);
+
+<span class="c">// после этого шага граф</span>
+<span class="c">// планировщику больше не нужен</span></pre>
+  </div>
+  <div class="num">7</div>
+</section>
+
+<!-- 8. DP: подготовка -->
+<section class="slide">
+  <div class="kicker">Planning/DpRoutePlanner.cs · шаг 2</div>
+  <h1>DP: константы и подготовка</h1>
+  <div class="cols" style="gap:40px">
+    <table class="dense">
+      <tr><th style="width:40%">Константа</th><th>Что это</th></tr>
+      <tr><td><code>MaxOrders = 20</code></td><td>Максимум заказов: дальше таблица не помещается в память</td></tr>
+      <tr><td><code>NotReached</code></td><td>В <code>finish</code>: состояние не достигнуто (int.MaxValue)</td></tr>
+      <tr><td><code>FromDepot = −1</code></td><td>В <code>previous</code>: заказ был первым, перед ним — склад</td></tr>
+    </table>
+    <table class="dense">
+      <tr><th style="width:32%">Переменная</th><th>Что это</th></tr>
+      <tr><td><code>k</code></td><td>Число заказов</td></tr>
+      <tr><td><code>deadline[i]</code></td><td>Дедлайн заказа i; без него — <code>long.MaxValue</code></td></tr>
+      <tr><td><code>service[i]</code></td><td>Время передачи заказа i</td></tr>
+      <tr><td><code>back[i]</code></td><td>Кратчайшее время от заказа i до склада</td></tr>
+      <tr><td><code>shift</code></td><td>Длина смены T</td></tr>
+      <tr><td><code>states</code></td><td>Размер таблицы: 2^k · k</td></tr>
+    </table>
+  </div>
+  <div class="num">8</div>
+</section>
+
+<!-- 9. DP: таблица и маска -->
+<section class="slide">
+  <div class="kicker">Planning/DpRoutePlanner.cs · состояние</div>
+  <h1>mask, last и таблица finish</h1>
+  <div class="cols" style="grid-template-columns: 1fr 1.05fr; gap:40px">
+    <div>
+      <h2>Битовая маска доставленных заказов</h2>
+      <svg viewBox="0 0 480 150" width="480" height="150">
+        <g font-size="16" text-anchor="middle">
+          <text x="80" y="22" fill="#52514e">бит 2</text><text x="200" y="22" fill="#52514e">бит 1</text><text x="320" y="22" fill="#52514e">бит 0</text>
+          <rect x="30" y="34" width="100" height="56" rx="8" fill="#2a78d6"/><text x="80" y="70" fill="#fff" font-size="24" font-weight="700">1</text>
+          <rect x="150" y="34" width="100" height="56" rx="8" fill="#f2f1ee"/><text x="200" y="70" font-size="24" font-weight="700">0</text>
+          <rect x="270" y="34" width="100" height="56" rx="8" fill="#2a78d6"/><text x="320" y="70" fill="#fff" font-size="24" font-weight="700">1</text>
+          <text x="430" y="70" font-size="22" font-weight="650">= 5</text>
+          <text x="80" y="118" fill="#52514e">заказ 2 ✓</text><text x="200" y="118" fill="#52514e">заказ 1</text><text x="320" y="118" fill="#52514e">заказ 0 ✓</text>
+        </g>
+      </svg>
+      <ul class="small" style="margin-top:6px">
+        <li><code>mask</code> — какие заказы уже доставлены</li>
+        <li><code>last</code> — заказ, доставленный последним: у него стоит курьер</li>
+        <li><code>next</code> — заказ, который пробуем следующим</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card dp">
+        <h2>finish[mask * k + last]</h2>
+        <p>Самая ранняя минута, когда курьер закончил заказ <b>last</b>, доставив ровно <b>mask</b></p>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>previous[mask * k + last]</h2>
+        <p>Какой заказ был перед last; <code>FromDepot</code> — если last первый. Тип <code>sbyte</code> — 1 байт</p>
+      </div>
+      <div class="callout"><p>Таблица двумерная <code>[mask][last]</code>, но хранится одним массивом: индекс = <code>mask · k + last</code></p></div>
+    </div>
+  </div>
+  <div class="num">9</div>
+</section>
+
+<!-- 10. Relax -->
+<section class="slide">
+  <div class="kicker">Planning/DpRoutePlanner.cs · переход</div>
+  <h1>Relax — один переход DP</h1>
+  <div class="cols" style="grid-template-columns: 1fr 1.1fr; gap:36px">
+    <table class="dense">
+      <tr><th style="width:36%">Переменная</th><th>Что это</th></tr>
+      <tr><td><code>fromPoint</code></td><td>Откуда едем — <b>точка</b> (0 или last + 1)</td></tr>
+      <tr><td><code>fromOrder</code></td><td>Откуда едем — <b>заказ</b>, для previous</td></tr>
+      <tr><td><code>time</code></td><td>Когда освободились на прошлом месте</td></tr>
+      <tr><td><code>leg</code></td><td>Время проезда до next</td></tr>
+      <tr><td><code>arrival</code></td><td>Время прибытия к next</td></tr>
+      <tr><td><code>done</code></td><td>Конец передачи заказа next</td></tr>
+      <tr><td><code>index</code></td><td>Ячейка состояния (mask ∪ {next}, next)</td></tr>
+    </table>
+<pre><span class="k">int</span> leg = travel.Minutes(fromPoint, next + 1);
+<span class="k">long</span> arrival = time + leg;
+<span class="k">if</span> (arrival &gt; deadline[next]) <span class="k">return</span>;  <span class="c">// дедлайн</span>
+
+<span class="k">long</span> done = arrival + service[next];
+<span class="k">if</span> (done + back[next] &gt; shift)   <span class="c">// отсечение:</span>
+    <span class="k">return</span>;                        <span class="c">// не успеть назад</span>
+
+<span class="c">// добавили next в маску</span>
+<span class="k">int</span> index = (mask | (<span class="h">1 &lt;&lt; next</span>)) * k + next;
+<span class="k">if</span> (done &lt; finish[index])         <span class="c">// раньше?</span>
+{
+    finish[index] = (<span class="k">int</span>)done;
+    previous[index] = fromOrder;
+}</pre>
+  </div>
+  <div class="num">10</div>
+</section>
+
+<!-- 11. Ответ и восстановление -->
+<section class="slide">
+  <div class="kicker">Planning/DpRoutePlanner.cs · ответ</div>
+  <h1>Выбор лучшего состояния и восстановление пути</h1>
+  <div class="cols" style="gap:40px">
+    <table class="dense">
+      <tr><th style="width:36%">Переменная</th><th>Что это</th></tr>
+      <tr><td><code>valueOfMask[mask]</code></td><td>Ценность заказов маски: <code>valueOfMask[mask &amp; (mask−1)]</code> + ценность младшего заказа</td></tr>
+      <tr><td><code>low</code></td><td>Номер младшего бита (<code>TrailingZeroCount</code>)</td></tr>
+      <tr><td><code>t</code></td><td>finish текущего состояния</td></tr>
+      <tr><td><code>returnMinute</code></td><td>Возврат на склад: <code>t + back[last]</code></td></tr>
+      <tr><td><code>bestValue</code>, <code>bestReturn</code></td><td>Лучшая ценность и возврат при ней; старт 0 и 0 — пустой маршрут</td></tr>
+      <tr><td><code>bestMask</code>, <code>bestLast</code></td><td>Где достигнут лучший результат; −1 — пустой маршрут</td></tr>
+    </table>
+    <div>
+      <h2>Восстановление — с конца</h2>
+<pre>for (mask = bestMask, last = bestLast;
+     last != FromDepot;)
+{
+    sequence.Add(last);
+    <span class="k">int</span> prev = previous[mask * k + last];
+    mask &amp;= ~(<span class="h">1 &lt;&lt; last</span>);   <span class="c">// снять бит</span>
+    last = prev;
+}
+sequence.Reverse();</pre>
+      <p class="small muted" style="margin-top:12px">mask &amp; (mask − 1) убирает младший установленный бит: 101 → 100</p>
+    </div>
+  </div>
+  <div class="num">11</div>
+</section>
+
+<!-- 12. Greedy + RouteBuilder -->
+<section class="slide">
+  <div class="kicker">Planning/GreedyRoutePlanner.cs · RouteBuilder.cs</div>
+  <h1>Жадный алгоритм и сборка плана</h1>
+  <div class="cols" style="gap:40px">
+    <div>
+      <h2>GreedyRoutePlanner — ближайший сосед</h2>
+      <table class="dense">
+        <tr><td style="width:34%"><code>done[i]</code></td><td>Заказ i уже доставлен</td></tr>
+        <tr><td><code>sequence</code></td><td>Порядок выбранных заказов</td></tr>
+        <tr><td><code>time</code>, <code>point</code></td><td>Текущая минута и точка</td></tr>
+        <tr><td><code>best</code></td><td>Ближайший выполнимый заказ; −1 — конец</td></tr>
+        <tr><td><code>bestLeg</code></td><td>Время езды до него</td></tr>
+        <tr><td><code>leg</code>, <code>back</code>, <code>arrival</code></td><td>Как в DP</td></tr>
+      </table>
+    </div>
+    <div>
+      <h2>RouteBuilder — общий для обоих</h2>
+      <p class="small"><code>TryBuild(problem, travel, sequence)</code> пересчитывает время по готовому порядку, проверяет дедлайны и смену, возвращает план или <code>null</code></p>
+      <table class="dense" style="margin-top:10px">
+        <tr><td style="width:34%"><code>orderIndex</code> / <code>next</code></td><td>Номер заказа / его точка (+1)</td></tr>
+        <tr><td><code>point</code>, <code>time</code></td><td>Где курьер и который час</td></tr>
+        <tr><td><code>BuildStreetPath</code></td><td>Склеивает пути; <code>Skip(1)</code> убирает повтор стыка</td></tr>
+        <tr><td><code>ClassifySkipped</code></td><td>Причины для недоставленных</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="num">12</div>
+</section>
+
+<!-- 13. Интерфейс, загрузчик, CLI -->
+<section class="slide">
+  <div class="kicker">Остальные классы</div>
+  <h1>Интерфейс, загрузка сценария и консоль</h1>
+  <div class="cols-3">
+    <div class="card"><h2>IRoutePlanner</h2><p>Общий интерфейс: <code>Name</code> и <code>Plan(problem, travel)</code>. DP и жадный взаимозаменяемы</p></div>
+    <div class="card"><h2>ScenarioLoader</h2><p>JSON → <code>DeliveryProblem</code>. <code>ScenarioDto</code>, <code>RoadDto</code>, <code>OrderDto</code> повторяют структуру файла. Битый JSON → <code>FormatException</code></p></div>
+    <div class="card"><h2>Program</h2><p>Без аргументов — все сценарии, путь к файлу — один сценарий, <code class="nw">--bench</code> — замер</p></div>
+  </div>
+  <div class="cols" style="margin-top:24px; gap:28px">
+    <div class="card"><h2>ConsoleReport</h2><p>Печать задачи, планов DP и жадного и их сравнения. <code>Solve</code> — решить и напечатать</p></div>
+    <div class="card"><h2>Benchmark</h2><p>Город-решётка 40×40, замер при k = 4…20. <code>Side</code> — сторона решётки, <code>dijkstraMs</code> и <code>dpMs</code> — время шагов</p></div>
+  </div>
+  <div class="num">13</div>
+</section>
+
+<!-- 14. Тесты -->
+<section class="slide">
+  <div class="kicker">tests/CourierRouting.Tests/</div>
+  <h1>Тестовые классы</h1>
+  <table class="dense">
+    <tr><th style="width:26%">Класс</th><th>Что проверяет</th></tr>
+    <tr><td><b>Reference</b></td><td><b>Независимый эталон:</b> <code>FloydWarshall</code> и полный перебор <code>BestByBruteForce</code>. <code>AssertPlanIsValid</code> перепроверяет любой план с нуля</td></tr>
+    <tr><td>TestData</td><td>Помощники: короткое создание сети, случайные задачи <code>RandomProblem</code></td></tr>
+    <tr><td>ShortestPathsTests</td><td>Дейкстра: обходы, недостижимость, одностороннее движение, сверка с Флойдом</td></tr>
+    <tr><td>DpRoutePlannerTests</td><td>DP: основной сценарий, пограничные случаи, сверка с перебором на 1500 задачах</td></tr>
+    <tr><td>GreedyVsDpTests</td><td>Жадный хуже DP на контрпримерах и никогда не лучше на случайных</td></tr>
+    <tr><td>ValidationTests</td><td>Некорректный ввод отклоняется</td></tr>
+    <tr><td>ScenarioFiles</td><td>Все демо-сценарии загружаются и решаются оптимально</td></tr>
+  </table>
+  <div class="num">14</div>
+</section>
+
+<!-- 15. Пример -->
+<section class="slide">
+  <div class="kicker">Пример · 02-greedy-trap</div>
+  <h1>Как DP проходит ловушку шаг за шагом</h1>
+  <p class="small muted" style="margin-bottom:12px">Заказы: 0 = N (Киоск), 1 = F1, 2 = F2. Смена 75. Со склада: N — 5, F1 — 30, F2 — 35 мин</p>
+  <table class="dense" style="font-size:15.5px">
+    <tr><th style="width:17%">Маска</th><th style="width:7%">last</th><th class="r" style="width:8%">finish</th><th>Как получено</th></tr>
+    <tr><td>001 {N}</td><td>N</td><td class="r">5</td><td>склад → N</td></tr>
+    <tr><td>010 {F1}</td><td>F1</td><td class="r">30</td><td>склад → F1</td></tr>
+    <tr><td>100 {F2}</td><td>F2</td><td class="r">35</td><td>склад → F2</td></tr>
+    <tr><td>011 {N, F1}</td><td>F1</td><td class="r">40</td><td>N(5) + 35; возврат 40 + 30 = 70 ≤ 75 ✓</td></tr>
+    <tr><td>011 {N, F1}</td><td>N</td><td class="r">65</td><td>F1(30) + 35; возврат 65 + 5 = 70 ✓</td></tr>
+    <tr><td>101 {N, F2}</td><td>—</td><td class="r">—</td><td>оба порядка дают возврат 80 &gt; 75 — отсечено</td></tr>
+    <tr><td><b>110 {F1, F2}</b></td><td>F2</td><td class="r">35</td><td>F1(30) + 5; возврат 35 + 35 = 70 ✓</td></tr>
+    <tr><td><b>110 {F1, F2}</b></td><td>F1</td><td class="r">40</td><td>F2(35) + 5; возврат 40 + 30 = 70 ✓</td></tr>
+    <tr><td>111 {все}</td><td>—</td><td class="r">—</td><td>любой порядок даёт возврат &gt; 75 — отсечено</td></tr>
+  </table>
+  <div class="callout" style="margin-top:14px"><p>Ценность: маска 011 → 6, маска 110 → <b>10</b>. Ответ — {F1, F2}, возврат в 70 мин</p></div>
+  <div class="num">15</div>
+</section>
+
+</body>
+</html>
